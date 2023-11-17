@@ -1,6 +1,5 @@
 package com.example.excelcheck;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -24,27 +23,8 @@ public class ExcelChecker {
             String[] columnNames = {"study_design", "mut1_genotype", "mut2_genotype", "mut3_genotype"};
             Map<String, List<String>> stringListMap = symptomsAnalyse(excelFile, columnNames);
             Map<String, Map<Integer, String>> stringMapMap = symptomsAnalyse(excelFil, columnNames, stringListMap);
-            for (Map.Entry<String, Map<Integer, String>> entry : stringMapMap.entrySet()) {
-                String key = entry.getKey();
-                Map<Integer, String> innerMap = entry.getValue();
+            Map<Integer, Map<String, String>> integerMapMap = levenshteinDistance(stringMapMap, stringListMap);
 
-                for (Map.Entry<Integer, String> inner : innerMap.entrySet()) {
-                    String secondString = inner.getValue();
-                    List<String> stringList = stringListMap.get(key);
-
-                    // Compare the second string with each string in the list
-                    for (String str : stringList) {
-                     int distance = LevenshteinDistance.getDefaultInstance().apply(secondString, str);
-                        boolean a = distance <= Math.max(secondString.length(), str.length()) / 2;
-                        if (a) {
-                            System.out.println(inner.getKey()+" " + secondString + "' and '" + str);
-
-                        }
-                        // You can use the Levenshtein distance as needed
-                    }
-                }
-
-            }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -195,4 +175,33 @@ public class ExcelChecker {
         return map;
     }
 
+    private static Map<Integer, Map<String, String>> levenshteinDistance(Map<String, Map<Integer, String>> stringMapMap, Map<String, List<String>> stringListMap) {
+        Map<Integer, Map<String, String>> levenshteinDistance = new HashMap<>();
+        Map<String, String> innerLevenshteinDistance = new HashMap<>();
+        for (Map.Entry<String, Map<Integer, String>> entry : stringMapMap.entrySet()) {
+            String key = entry.getKey();
+            Map<Integer, String> innerMap = entry.getValue();
+
+            for (Map.Entry<Integer, String> inner : innerMap.entrySet()) {
+                String secondString = inner.getValue();
+                List<String> stringList = stringListMap.get(key);
+
+                // Compare the second string with each string in the list
+                for (String str : stringList) {
+                    int distance = LevenshteinDistance.getDefaultInstance().apply(secondString, str);
+                    boolean a = distance <= Math.max(secondString.length(), str.length()) / 2;
+                    if (a && levenshteinDistance.get(inner.getKey()) == null) {
+                        innerLevenshteinDistance.put(secondString, str);
+
+                        levenshteinDistance.put(inner.getKey(), innerLevenshteinDistance);
+                        System.out.println(levenshteinDistance);
+                    }
+
+                    // You can use the Levenshtein distance as needed
+                }
+            }
+
+        }
+        return levenshteinDistance;
+    }
 }
