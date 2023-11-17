@@ -1,4 +1,5 @@
 package com.example.excelcheck;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
@@ -28,16 +29,16 @@ import java.util.stream.IntStream;
 public class ExcelChecker {
     @Autowired
     private AttachementUploadService attachmentService;
+    private  static Map<String, String> innerMap;
 
     @GetMapping("/checkExcel")
-    public String firstStep(Model model) {
-//        model.addAttribute("retypeEmail", new RetypeEmail());
+    public String firstStep() {
         return "checkExcel";
     }
 
     @PostMapping("/fileUpload")
 
-    public String uploadAttachment(@RequestPart MultipartFile file) {
+    public String uploadAttachment(@RequestPart MultipartFile file, Model model) {
         String examplFilePath = attachmentService.upload(file);
         try {
             String exampleFilePath = "C:\\Users\\gohar\\IdeaProjects\\excelCheck\\example.xlsx";
@@ -49,6 +50,7 @@ public class ExcelChecker {
 
             Map<String, List<String>> symptomsMap = extractColumnValues(exampleFileInputStream, columnNames);
             Map<String, Map<Integer, Boolean>> result = analyzeSymptoms(examplFileInputStream, columnNames, symptomsMap);
+        model.addAttribute("map",result);
 
             System.out.println(symptomsMap);
             System.out.println(result);
@@ -106,7 +108,6 @@ public class ExcelChecker {
                             .entrySet().stream()
                             .filter(entry -> entry.getValue()) // Filter only values that are true
                             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
                     resultMap.put(columnNames[i], valuesMap);
                 } else {
                     // If columnIndex is -1, add to resultMap only if the condition is false
@@ -156,13 +157,29 @@ public class ExcelChecker {
                 .map(c -> {
                     switch (c.getCellType()) {
                         case STRING:
-                            return symptomsList.contains(c.getStringCellValue());
+                            return symptomsList.stream()
+                                    .anyMatch(symptom -> isSimilar(c.getStringCellValue(), symptom));
                         case NUMERIC:
-                            return symptomsList.contains(String.valueOf(c.getNumericCellValue()));
+                            return symptomsList.stream()
+                                    .anyMatch(symptom -> isSimilar(String.valueOf(c.getNumericCellValue()), symptom));
                         default:
                             return false;
                     }
                 })
                 .orElse(false);
     }
+
+    private static boolean isSimilar(String str1, String str2) {
+      Map< String, Map<Integer,Map<String,String>>> levenshteinDistance=new HashMap();
+       innerMap=new HashMap<>();
+        int distance = LevenshteinDistance.getDefaultInstance().apply(str1, str2);
+      boolean a=  distance <= Math.max(str1.length(), str2.length()) / 2;
+        if(!a){
+            innerMap.put(str1,str2);
+
+        }
+        return a;
+    }
+
+
 }

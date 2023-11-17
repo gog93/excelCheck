@@ -34,7 +34,11 @@
             <artifactId>poi</artifactId>
             <version>5.2.0</version> <!-- Use the latest version available -->
         </dependency>
-
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.9</version> <!-- Use the latest version available -->
+        </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
