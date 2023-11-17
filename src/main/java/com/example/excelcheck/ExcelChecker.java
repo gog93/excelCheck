@@ -1,185 +1,198 @@
 package com.example.excelcheck;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 
-import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-@Controller
-@RequiredArgsConstructor
 public class ExcelChecker {
-    @Autowired
-    private AttachementUploadService attachmentService;
-    private  static Map<String, String> innerMap;
 
-    @GetMapping("/checkExcel")
-    public String firstStep() {
-        return "checkExcel";
-    }
-
-    @PostMapping("/fileUpload")
-
-    public String uploadAttachment(@RequestPart MultipartFile file, Model model) {
-        String examplFilePath = attachmentService.upload(file);
+    public static void main(String[] args) {
         try {
-            String exampleFilePath = "C:\\Users\\gohar\\IdeaProjects\\excelCheck\\example.xlsx";
-
-            FileInputStream exampleFileInputStream = new FileInputStream(exampleFilePath);
-            FileInputStream examplFileInputStream = new FileInputStream(examplFilePath);
-
+            FileInputStream excelFile = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\example.xlsx");
+            FileInputStream excelFil = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\exampl.xlsx");
             String[] columnNames = {"study_design", "mut1_genotype", "mut2_genotype", "mut3_genotype"};
+            Map<String, List<String>> stringListMap = symptomsAnalyse(excelFile, columnNames);
+            Map<String, Map<Integer, String>> stringMapMap = symptomsAnalyse(excelFil, columnNames, stringListMap);
+            for (Map.Entry<String, Map<Integer, String>> entry : stringMapMap.entrySet()) {
+                String key = entry.getKey();
+                Map<Integer, String> innerMap = entry.getValue();
 
-            Map<String, List<String>> symptomsMap = extractColumnValues(exampleFileInputStream, columnNames);
-            Map<String, Map<Integer, Boolean>> result = analyzeSymptoms(examplFileInputStream, columnNames, symptomsMap);
-        model.addAttribute("map",result);
+                for (Map.Entry<Integer, String> inner : innerMap.entrySet()) {
+                    String secondString = inner.getValue();
+                    List<String> stringList = stringListMap.get(key);
 
-            System.out.println(symptomsMap);
-            System.out.println(result);
+                    // Compare the second string with each string in the list
+                    for (String str : stringList) {
+                     int distance = LevenshteinDistance.getDefaultInstance().apply(secondString, str);
+                        boolean a = distance <= Math.max(secondString.length(), str.length()) / 2;
+                        if (a) {
+                            System.out.println(inner.getKey()+" " + secondString + "' and '" + str);
 
+                        }
+                        // You can use the Levenshtein distance as needed
+                    }
+                }
+
+            }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        return "checkExcel";
+
+
     }
 
-    private static Map<String, List<String>> extractColumnValues(FileInputStream excelFile, String[] columnNames) {
+    private static Map<String, List<String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames) {
         Map<String, List<String>> columnValuesMap = new HashMap<>();
-
         try {
+            // Load the Excel file
             Workbook workbook = new XSSFWorkbook(excelFile);
-            Sheet sheet = workbook.getSheetAt(0);
+            Sheet sheet = workbook.getSheetAt(0); // Assuming data is in the first sheet
 
-            IntStream.range(0, columnNames.length).forEach(i -> {
-                int columnIndex = findColumnIndex(sheet.getRow(0), columnNames[i]);
-                if (columnIndex != -1) {
-                    List<String> valuesList = IntStream.range(1, 16)
-                            .mapToObj(rowIndex -> sheet.getRow(rowIndex).getCell(columnIndex))
-                            .map(cell -> handleCellType(cell))
-                            .collect(Collectors.toList());
+            // Define the column names
 
-                    columnValuesMap.put(columnNames[i], valuesList);
-                } else {
-                    System.out.println("Column not found: " + columnNames[i]);
+            // Find the column indices based on the column names
+            int[] columnIndices = new int[columnNames.length];
+            Row headerRow = sheet.getRow(0);
+
+            for (int i = 0; i < columnNames.length; i++) {
+                columnIndices[i] = -1;
+                for (Cell cell : headerRow) {
+                    if (cell.getStringCellValue().equals(columnNames[i])) {
+                        columnIndices[i] = cell.getColumnIndex();
+                        break;
+                    }
                 }
-            });
+
+                if (columnIndices[i] == -1) {
+                    System.out.println("Column not found: " + columnNames[i]);
+                    return columnValuesMap;
+                }
+            }
+
+            // Check each value in the specified columns
+// Check each value in the specified columns
+            for (int rowIndex = 1; rowIndex <= 15; rowIndex++) {
+                Row currentRow = sheet.getRow(rowIndex);
+                for (int i = 0; i < columnNames.length; i++) {
+                    Cell cell = currentRow.getCell(columnIndices[i]);
+                    String columnName = columnNames[i];
+
+                    // If the column name is not already in the map, create a new list for it
+                    columnValuesMap.putIfAbsent(columnName, new ArrayList<>());
+
+                    // Check the cell type and handle accordingly
+                    if (cell != null) {
+                        switch (cell.getCellType()) {
+                            case STRING:
+
+                                columnValuesMap.get(columnName).add(cell.getStringCellValue());
+                                break;
+                            case NUMERIC:
+                                // Handle numeric values, e.g., format as string
+                                columnValuesMap.get(columnName).add(String.valueOf(cell.getNumericCellValue()));
+                                break;
+                            default:
+                                break;
+                        }
+                    } else {
+                        // Add an empty string if the cell is null
+                        break;
+                    }
+                }
+            }
+            System.out.println(columnValuesMap);
+            // Now, columnValuesMap contains a mapping of column names to lists of row values.
+
+            // You can print or process the values as needed.
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return columnValuesMap;
     }
 
-    private static Map<String, Map<Integer, Boolean>> analyzeSymptoms(FileInputStream excelFile, String[] columnNames, Map<String, List<String>> symptomsMap) {
-        Map<String, Map<Integer, Boolean>> resultMap = new HashMap<>();
-
+    private static Map<String, Map<Integer, String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames, Map<String, List<String>> symptomsMap) {
+        Map<String, Map<Integer, String>> map = new HashMap<>();
         try {
+            // Load the Excel file
             Workbook workbook = new XSSFWorkbook(excelFile);
-            Sheet sheet = workbook.getSheetAt(0);
+            Sheet sheet = workbook.getSheetAt(0); // Assuming data is in the first sheet
 
-            IntStream.range(0, columnNames.length).forEach(i -> {
-                int columnIndex = findColumnIndex(sheet.getRow(0), columnNames[i]);
-                if (columnIndex != -1) {
-                    Map<Integer, Boolean> valuesMap = IntStream.range(16, 110)
-                            .boxed()
-                            .collect(Collectors.toMap(rowIndex -> rowIndex, rowIndex -> {
-                                Cell cell = sheet.getRow(rowIndex - 1).getCell(columnIndex);
-                                return !handleCellType(cell, symptomsMap.get(columnNames[i]));
-                            }))
-                            .entrySet().stream()
-                            .filter(entry -> entry.getValue()) // Filter only values that are true
-                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                    resultMap.put(columnNames[i], valuesMap);
-                } else {
-                    // If columnIndex is -1, add to resultMap only if the condition is false
-                    boolean condition = false; // Replace with your actual condition
-                    if (!condition) {
-                        Map<Integer, Boolean> valuesMap = IntStream.range(16, 112)
-                                .boxed()
-                                .collect(Collectors.toMap(rowIndex -> rowIndex, rowIndex -> false));
-                        resultMap.put(columnNames[i], valuesMap);
+            // Define the column names
+
+            // Find the column indices based on the column names
+            int[] columnIndices = new int[columnNames.length];
+            Row headerRow = sheet.getRow(0);
+
+            for (int i = 0; i < columnNames.length; i++) {
+                columnIndices[i] = -1;
+                for (Cell cell : headerRow) {
+                    if (cell.getStringCellValue().equals(columnNames[i])) {
+                        columnIndices[i] = cell.getColumnIndex();
+                        break;
                     }
                 }
-            });
+
+                if (columnIndices[i] == -1) {
+                    System.out.println("Column not found: " + columnNames[i]);
+                    return map;
+                }
+            }
+            boolean check = true;
+            for (int rowIndex = 16; rowIndex <= 111; rowIndex++) {
+                Row currentRow = sheet.getRow(rowIndex);
+                for (int i = 0; i < columnNames.length; i++) {
+                    Cell cell = currentRow.getCell(columnIndices[i]);
+                    String columnName = columnNames[i];
+
+                    map.putIfAbsent(columnName, new HashMap<>());
+
+                    // Check the cell type and handle accordingly
+                    if (cell != null) {
+                        switch (cell.getCellType()) {
+                            case STRING:
+
+                                boolean contains = symptomsMap.get(columnName).contains(cell.getStringCellValue());
+                                if (!contains) {
+                                    map.get(columnName).put(rowIndex, cell.getStringCellValue());
+                                }
+                                break;
+                            case NUMERIC:
+                                contains = symptomsMap.get(columnName).contains(String.valueOf(cell.getNumericCellValue()));
+                                if (!contains) {
+                                    map.get(columnName).put(rowIndex, String.valueOf(cell.getNumericCellValue()));
+                                }
+
+                                break;
+                            default:
+                                break;
+                        }
+                    } else {
+                        // Add an empty string if the cell is null
+                        break;
+                    }
+                }
+            }
+            System.out.println(map);
+            // Now, columnValuesMap contains a mapping of column names to lists of row values.
+
+            // You can print or process the values as needed.
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-        resultMap.forEach((key, innerMap) ->
-                innerMap.forEach((innerKey, value) -> innerMap.put(innerKey, false)));
-
-        return resultMap;
+        return map;
     }
-
-    private static int findColumnIndex(Row headerRow, String columnName) {
-        return IntStream.range(0, headerRow.getLastCellNum())
-                .filter(i -> headerRow.getCell(i).getStringCellValue().equals(columnName))
-                .findFirst()
-                .orElse(-1);
-    }
-
-    private static String handleCellType(Cell cell) {
-        return Optional.ofNullable(cell)
-                .map(c -> {
-                    switch (c.getCellType()) {
-                        case STRING:
-                            return c.getStringCellValue();
-                        case NUMERIC:
-                            return String.valueOf(c.getNumericCellValue());
-                        default:
-                            return "";
-                    }
-                })
-                .orElse("");
-    }
-
-    private static boolean handleCellType(Cell cell, List<String> symptomsList) {
-        return Optional.ofNullable(cell)
-                .map(c -> {
-                    switch (c.getCellType()) {
-                        case STRING:
-                            return symptomsList.stream()
-                                    .anyMatch(symptom -> isSimilar(c.getStringCellValue(), symptom));
-                        case NUMERIC:
-                            return symptomsList.stream()
-                                    .anyMatch(symptom -> isSimilar(String.valueOf(c.getNumericCellValue()), symptom));
-                        default:
-                            return false;
-                    }
-                })
-                .orElse(false);
-    }
-
-    private static boolean isSimilar(String str1, String str2) {
-      Map< String, Map<Integer,Map<String,String>>> levenshteinDistance=new HashMap();
-       innerMap=new HashMap<>();
-        int distance = LevenshteinDistance.getDefaultInstance().apply(str1, str2);
-      boolean a=  distance <= Math.max(str1.length(), str2.length()) / 2;
-        if(!a){
-            innerMap.put(str1,str2);
-
-        }
-        return a;
-    }
-
 
 }
