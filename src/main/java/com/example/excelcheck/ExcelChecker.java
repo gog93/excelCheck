@@ -1,100 +1,69 @@
 package com.example.excelcheck;
-
 import org.apache.commons.text.similarity.LevenshteinDistance;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class ExcelChecker {
 
     public static void main(String[] args) {
         try {
-            FileInputStream excelFile = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\example.xlsx");
-            FileInputStream excelFil = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\exampl.xlsx");
+            FileInputStream excelFile1 = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\example.xlsx");
+            FileInputStream excelFile2 = new FileInputStream("C:\\Users\\gohar\\IdeaProjects\\excelCheck\\exampl.xlsx");
             String[] columnNames = {"study_design", "mut1_genotype", "mut2_genotype", "mut3_genotype"};
-            Map<String, List<String>> stringListMap = symptomsAnalyse(excelFile, columnNames);
-            Map<String, Map<Integer, String>> stringMapMap = symptomsAnalyse(excelFil, columnNames, stringListMap);
+
+            Map<String, Set<String>> stringListMap = symptomsAnalyse(excelFile1, columnNames);
+            Map<String, Map<Integer, String>> stringMapMap = symptomsAnalyse(excelFile2, columnNames, stringListMap);
             Map<Integer, Map<String, String>> integerMapMap = levenshteinDistance(stringMapMap, stringListMap);
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-
-
     }
 
-    private static Map<String, List<String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames) {
-        Map<String, List<String>> columnValuesMap = new HashMap<>();
+    private static Map<String, Set<String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames) {
+        Map<String, Set<String>> columnValuesMap = new HashMap<>();
+
         try {
-            // Load the Excel file
             Workbook workbook = new XSSFWorkbook(excelFile);
-            Sheet sheet = workbook.getSheetAt(0); // Assuming data is in the first sheet
+            Sheet sheet = workbook.getSheetAt(0);
 
-            // Define the column names
+            int[] columnIndices = Arrays.stream(columnNames)
+                    .mapToInt(name -> IntStream.range(0, sheet.getRow(0).getLastCellNum())
+                            .filter(i -> sheet.getRow(0).getCell(i).getStringCellValue().equals(name))
+                            .findFirst().orElse(-1))
+                    .toArray();
 
-            // Find the column indices based on the column names
-            int[] columnIndices = new int[columnNames.length];
-            Row headerRow = sheet.getRow(0);
-
-            for (int i = 0; i < columnNames.length; i++) {
-                columnIndices[i] = -1;
-                for (Cell cell : headerRow) {
-                    if (cell.getStringCellValue().equals(columnNames[i])) {
-                        columnIndices[i] = cell.getColumnIndex();
-                        break;
-                    }
-                }
-
-                if (columnIndices[i] == -1) {
-                    System.out.println("Column not found: " + columnNames[i]);
-                    return columnValuesMap;
-                }
-            }
-
-            // Check each value in the specified columns
-// Check each value in the specified columns
-            for (int rowIndex = 1; rowIndex <= 15; rowIndex++) {
+            IntStream.range(1, 16).forEach(rowIndex -> {
                 Row currentRow = sheet.getRow(rowIndex);
-                for (int i = 0; i < columnNames.length; i++) {
+                IntStream.range(0, columnNames.length).forEach(i -> {
                     Cell cell = currentRow.getCell(columnIndices[i]);
                     String columnName = columnNames[i];
 
-                    // If the column name is not already in the map, create a new list for it
-                    columnValuesMap.putIfAbsent(columnName, new ArrayList<>());
+                    columnValuesMap.computeIfAbsent(columnName, k -> new HashSet<>());
 
-                    // Check the cell type and handle accordingly
                     if (cell != null) {
                         switch (cell.getCellType()) {
                             case STRING:
-
                                 columnValuesMap.get(columnName).add(cell.getStringCellValue());
                                 break;
                             case NUMERIC:
-                                // Handle numeric values, e.g., format as string
                                 columnValuesMap.get(columnName).add(String.valueOf(cell.getNumericCellValue()));
                                 break;
                             default:
                                 break;
                         }
-                    } else {
-                        // Add an empty string if the cell is null
-                        break;
                     }
-                }
-            }
-            System.out.println(columnValuesMap);
-            // Now, columnValuesMap contains a mapping of column names to lists of row values.
+                });
+            });
 
-            // You can print or process the values as needed.
+            System.out.println(columnValuesMap);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -102,47 +71,30 @@ public class ExcelChecker {
         return columnValuesMap;
     }
 
-    private static Map<String, Map<Integer, String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames, Map<String, List<String>> symptomsMap) {
+    private static Map<String, Map<Integer, String>> symptomsAnalyse(FileInputStream excelFile, String[] columnNames, Map<String, Set<String>> symptomsMap) {
         Map<String, Map<Integer, String>> map = new HashMap<>();
+
         try {
-            // Load the Excel file
             Workbook workbook = new XSSFWorkbook(excelFile);
-            Sheet sheet = workbook.getSheetAt(0); // Assuming data is in the first sheet
+            Sheet sheet = workbook.getSheetAt(0);
 
-            // Define the column names
+            int[] columnIndices = Arrays.stream(columnNames)
+                    .mapToInt(name -> IntStream.range(0, sheet.getRow(0).getLastCellNum())
+                            .filter(i -> sheet.getRow(0).getCell(i).getStringCellValue().equals(name))
+                            .findFirst().orElse(-1))
+                    .toArray();
 
-            // Find the column indices based on the column names
-            int[] columnIndices = new int[columnNames.length];
-            Row headerRow = sheet.getRow(0);
-
-            for (int i = 0; i < columnNames.length; i++) {
-                columnIndices[i] = -1;
-                for (Cell cell : headerRow) {
-                    if (cell.getStringCellValue().equals(columnNames[i])) {
-                        columnIndices[i] = cell.getColumnIndex();
-                        break;
-                    }
-                }
-
-                if (columnIndices[i] == -1) {
-                    System.out.println("Column not found: " + columnNames[i]);
-                    return map;
-                }
-            }
-            boolean check = true;
-            for (int rowIndex = 16; rowIndex <= 111; rowIndex++) {
+            IntStream.range(16, 112).forEach(rowIndex -> {
                 Row currentRow = sheet.getRow(rowIndex);
-                for (int i = 0; i < columnNames.length; i++) {
+                IntStream.range(0, columnNames.length).forEach(i -> {
                     Cell cell = currentRow.getCell(columnIndices[i]);
                     String columnName = columnNames[i];
 
-                    map.putIfAbsent(columnName, new HashMap<>());
+                    map.computeIfAbsent(columnName, k -> new HashMap<>());
 
-                    // Check the cell type and handle accordingly
                     if (cell != null) {
                         switch (cell.getCellType()) {
                             case STRING:
-
                                 boolean contains = symptomsMap.get(columnName).contains(cell.getStringCellValue());
                                 if (!contains) {
                                     map.get(columnName).put(rowIndex, cell.getStringCellValue());
@@ -153,21 +105,15 @@ public class ExcelChecker {
                                 if (!contains) {
                                     map.get(columnName).put(rowIndex, String.valueOf(cell.getNumericCellValue()));
                                 }
-
                                 break;
                             default:
                                 break;
                         }
-                    } else {
-                        // Add an empty string if the cell is null
-                        break;
                     }
-                }
-            }
-            System.out.println(map);
-            // Now, columnValuesMap contains a mapping of column names to lists of row values.
+                });
+            });
 
-            // You can print or process the values as needed.
+            System.out.println(map);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -175,33 +121,26 @@ public class ExcelChecker {
         return map;
     }
 
-    private static Map<Integer, Map<String, String>> levenshteinDistance(Map<String, Map<Integer, String>> stringMapMap, Map<String, List<String>> stringListMap) {
+    private static Map<Integer, Map<String, String>> levenshteinDistance(Map<String, Map<Integer, String>> stringMapMap, Map<String, Set<String>> stringListMap) {
         Map<Integer, Map<String, String>> levenshteinDistance = new HashMap<>();
-        Map<String, String> innerLevenshteinDistance = new HashMap<>();
-        for (Map.Entry<String, Map<Integer, String>> entry : stringMapMap.entrySet()) {
-            String key = entry.getKey();
-            Map<Integer, String> innerMap = entry.getValue();
 
-            for (Map.Entry<Integer, String> inner : innerMap.entrySet()) {
-                String secondString = inner.getValue();
-                List<String> stringList = stringListMap.get(key);
+        stringMapMap.forEach((key, innerMap) ->
+                innerMap.forEach((innerKey, innerValue) -> {
+                    Set<String> stringList = stringListMap.get(key);
+                    Map<String, String> innerLevenshteinDistance = new HashMap<>();
 
-                // Compare the second string with each string in the list
-                for (String str : stringList) {
-                    int distance = LevenshteinDistance.getDefaultInstance().apply(secondString, str);
-                    boolean a = distance <= Math.max(secondString.length(), str.length()) / 2;
-                    if (a && levenshteinDistance.get(inner.getKey()) == null) {
-                        innerLevenshteinDistance.put(secondString, str);
+                    stringList.stream()
+                            .filter(str -> LevenshteinDistance.getDefaultInstance().apply(innerValue, str)
+                                    <= Math.max(innerValue.length(), str.length()) / 2)
+                            .findFirst()
+                            .ifPresent(match -> innerLevenshteinDistance.put(innerValue, match));
 
-                        levenshteinDistance.put(inner.getKey(), innerLevenshteinDistance);
+                    if (!innerLevenshteinDistance.isEmpty()) {
+                        levenshteinDistance.put(innerKey, innerLevenshteinDistance);
                         System.out.println(levenshteinDistance);
                     }
+                }));
 
-                    // You can use the Levenshtein distance as needed
-                }
-            }
-
-        }
         return levenshteinDistance;
     }
 }
