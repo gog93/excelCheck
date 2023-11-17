@@ -26,6 +26,21 @@
     </tr>
     </tbody>
 </table>
+    <table>
+    <thead>
+    <tr>
+        <th>Key</th>
+        <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- Iterate over the map entries and display each key-value pair -->
+    <tr th:each="entry : ${levenshteinDistance}">
+        <td th:text="${entry.key}"></td>
+        <td th:text="${entry.value}"></td>
+    </tr>
+    </tbody>
+</table>
 </div>
 </body>
 </html>
