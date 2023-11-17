@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 @Controller
 @RequiredArgsConstructor
-public class ExcelChecker {
+public class ExcelCheckerController {
     @Autowired
     private AttachementUploadService attachmentService;
     @Autowired
